@@ -1,0 +1,22 @@
+---
+title: "Final Project Components"
+author: "Sinan Isik"
+date: "12/1/2016"
+output: html_document
+---
+
+```{r}
+
+library(dplyr)
+
+dat<-readRDS("/Users/sinanisik/Desktop/NYC Bike Share Data.rds")
+
+experiment2<-as.character(dat$starttime)
+subStartTime<-substr(experiment2, start=10, stop=15)
+experiment3 <- substr (subStartTime, start=1, stop=2)
+experiment4 <- substr (subStartTime, start=3, stop=5 )
+startTimeHours<-gsub (":", "", experiment3 )
+startTimeMinutes<-gsub (":", "", experiment4 )
+
+
+```
