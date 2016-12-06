@@ -1,0 +1,298 @@
+---
+title: 'January 2015 New York City CitiBike:  Average Distance and Speed By Gender
+  Throughout the Day'
+author: "Cristian E. Nuno"
+date: "December 5, 2016"
+output: pdf_document
+---
+```{r Load Necessary Data, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+NYCB <- readRDS("/Users/cristiannuno/NYCBikeShareData.rds")
+library( dplyr )
+library( pander )
+library( geosphere )
+library( plotly )
+NYCB <- tbl_df( NYCB )
+```
+
+```{r Average Length of Bike Ride by Start Time, echo=FALSE}
+
+# Start Time Revised
+experiment2<-as.character(NYCB$starttime)
+subStartTime<-substr(experiment2, start=10, stop=15)
+
+# Makes Start Time as a Percentage (0.00 - 23:99)
+starttime_num <- sapply(strsplit(subStartTime,":"),
+       function(x) {
+           x <- as.numeric(x)
+           x[1]+x[2]/60
+       }
+)
+
+# Stop Time Revised
+experiment3 <- as.character(NYCB$stoptime)
+subStopTime<-substr(experiment3, start=10, stop=15)
+
+# Makes Stop Time as a Percentage
+stoptime_num <- sapply(strsplit(subStopTime,":"),
+       function(x) {
+           x <- as.numeric(x)
+           x[1]+x[2]/60
+       }
+)
+
+# Create Point A and Point B: Combine start and end station latitude and longitude
+start.LA.LO <- select(NYCB, start.station.latitude, start.station.longitude)
+end.LA.LO <- select(NYCB, end.station.latitude, end.station.longitude)
+
+# Calculate distance. Convert meters to miles and round to the nearest 100th.
+distance <- round(distGeo(start.LA.LO, end.LA.LO, 
+                          a=6378137, f=1/298.257223563)*0.000621371, 2)
+
+# Calculate speed as the difference between stop time and start time. 
+# Speed is measured in minutes. Round to the nearest 100th.
+speed <- round((stoptime_num - starttime_num)*100, 2)
+
+# Calculate age as the difference between the current year (2016) and the birth year
+age <- 2016 - NYCB$birth.year
+
+# Add these new variables into a new dataframe
+NYCB <- mutate( NYCB , starttime_num = starttime_num , stoptime_num = stoptime_num, 
+                distance = distance, speed = speed, age = age )
+
+# Label half hour intervals
+half.hour.labels <- c("12:00-12:30 am", "12:30-1:00 am", "1:00-1:30 am", "1:30-2:00 am",
+                      "2:00-2:30 am","2:30-3:00 am", "3:00-3:30 am", "3:30-4:00 am",
+                      "4:00-4:30 am", "4:30-5:00 am","5:00-5:30 am", "5:30-6:00 am",
+                      "6:00-6:30 am", "6:30-7:00 am","7:00-7:30 am", "7:30-8:00 am",
+                      "8:00-8:30 am", "8:30-9:00 am","9:00-9:30 am", "9:30-10:00 am",
+                      "10:00-10:30 am","10:30-11:00 am", "11:00-11:30 am", "11:30-12:00 pm",
+                      "12:00-12:30 pm", "12:30-1:00pm", "1:00-1:30 pm", "1:30-2:00 pm",
+                      "2:00-2:30 pm","2:30-3:00 pm", "3:00-3:30 pm", "3:30-4:00 pm",
+                      "4:00-4:30 pm", "4:30-5:00 pm","5:00-5:30 pm", "5:30-6:00 pm",
+                      "6:00-6:30 pm", "6:30-7:00 pm","7:00-7:30 pm", "7:30-8:00 pm",
+                      "8:00-8:30 pm", "8:30-9:00 pm","9:00-9:30 pm", "9:30-10:00 pm",
+                      "10:00-10:30 pm","10:30-11:00 pm", "11:00-11:30 pm", "11:30-12:00 am")
+
+# Label age intervals
+age.labels <- c("17-21", "21-25", "25-29", "29-33", "33-37", "37-41", "41-45",
+                "45-49", "49-53", "53-57", "57-61", "61-65", "65-69", "73-77",
+                "77-81", "81-85", "85-89", "89-93", "93-97", "97-100")
+
+# Select variables for distance analysis
+distance.by.gender.time <- select( NYCB, distance, gender, starttime_num)
+distance.by.gender.age <- select(NYCB, distance, gender, age)
+
+speed.by.gender.time <- select( NYCB, speed, gender, starttime_num)
+speed.by.gender.age <- select( NYCB, speed, gender, age)
+
+# Partition variables by gender
+distance.by.females.time <- filter( distance.by.gender.time, gender==2)
+distance.by.males.time <- filter( distance.by.gender.time, gender==1)
+
+distance.by.females.age <- filter( distance.by.gender.age, gender==2)
+distance.by.males.age <- filter( distance.by.gender.age, gender==1)
+
+speed.by.females.time <- filter( speed.by.gender.time, gender==2)
+speed.by.males.time <- filter( speed.by.gender.time, gender==1)
+
+speed.by.females.age <- filter( speed.by.gender.age, gender==2)
+speed.by.males.age <- filter( speed.by.gender.age, gender==1)
+
+# Separate gender speed and distance by time and age
+
+distance.by.females.time <- mutate(distance.by.females.time,
+                              half_hour=cut(starttime_num,
+                                            breaks=seq( from=0, to=24, by=0.5 ),
+                                            labels=half.hour.labels )
+                              )
+
+distance.by.males.time <- mutate(distance.by.males.time,
+                              half_hour=cut(starttime_num,
+                                            breaks=seq( from=0, to=24, by=0.5 ),
+                                            labels=half.hour.labels )
+                              )
+
+distance.by.females.age <- mutate(distance.by.females.age,
+                              age_group=cut(age,
+                                            breaks=seq( from=17, to=100, by=4 ),
+                                            labels=age.labels )
+                              )
+
+distance.by.males.age <- mutate(distance.by.males.age,
+                              age_group=cut(age,
+                                            breaks=seq( from=17, to=100, by=4 ),
+                                            labels=age.labels )
+                              )
+
+speed.by.females.time <- mutate(speed.by.females.time,
+                               half_hour=cut(starttime_num,
+                                             breaks=seq( from=0, to=24, by=0.5),
+                                             labels=half.hour.labels)
+                               )
+speed.by.males.time <- mutate(speed.by.males.time,
+                               half_hour=cut(starttime_num,
+                                             breaks=seq( from=0, to=24, by=0.5),
+                                             labels=half.hour.labels)
+                               )
+
+speed.by.females.age <- mutate(speed.by.females.age,
+                               age_group=cut(age,
+                                             breaks=seq( from=17, to=100, by=4),
+                                             labels=age.labels)
+                           )
+speed.by.males.age <- mutate(speed.by.males.age,
+                               age_group=cut(age,
+                                             breaks=seq(from=17, to=100, by=4),
+                                             labels=age.labels)
+                           )
+
+# Group separated distance and speed variables by half hour and age groups
+distance.by.females.time <- group_by( distance.by.females.time, half_hour)
+distance.by.males.time <- group_by( distance.by.males.time, half_hour)
+
+distance.by.females.age <- group_by( distance.by.females.age, age_group)
+distance.by.males.age <- group_by( distance.by.males.age, age_group)
+
+speed.by.females.time <- group_by( speed.by.females.time, half_hour)
+speed.by.males.time <- group_by( speed.by.males.time, half_hour)
+
+speed.by.females.age <- group_by( speed.by.females.age, age_group)
+speed.by.males.age <- group_by( speed.by.males.age, age_group)
+
+# Aggregate the average distance and speed (using median) for each group by half-hour
+distance.by.females.time <- setNames( aggregate( distance.by.females.time$distance,
+                                     list( distance.by.females.time$half_hour), median),
+                           c( "Time", "Distance_Female"))
+
+distance.by.males.time <- setNames( aggregate( distance.by.males.time$distance,
+                                     list( distance.by.males.time$half_hour), median),
+                           c( "Time", "Distance_Male"))
+
+distance.by.females.age <- setNames( aggregate( distance.by.females.age$distance,
+                                     list( distance.by.females.age$age_group), median),
+                           c( "Age_Group", "Distance_Female"))
+
+distance.by.males.age <- setNames( aggregate( distance.by.males.age$distance,
+                                              list( distance.by.males.age$age_group), median),
+                                   c( "Age_Group", "Distance_Male"))
+
+speed.by.females.time <- setNames(aggregate(speed.by.females.time$speed,
+                                     list(speed.by.females.time$half_hour), median),
+                           c("Time", "Speed_Female"))
+
+speed.by.males.time <- setNames(aggregate(speed.by.males.time$speed,
+                                     list(speed.by.males.time$half_hour), median),
+                           c("Time", "Speed_Male"))
+
+speed.by.females.age <- setNames( aggregate( speed.by.females.age$speed,
+                                     list( speed.by.females.age$age_group), median),
+                           c( "Age_Group", "Speed_Female"))
+
+speed.by.males.age <- setNames( aggregate( speed.by.males.age$speed,
+                                     list( speed.by.males.age$age_group), median),
+                           c( "Age_Group", "Speed_Male"))
+
+# Merge Four Distance and Four Speed datasets by Time and Age_Group
+final.distance.time <- merge( distance.by.females.time,
+                              distance.by.males.time,
+                              by="Time"
+                         )
+
+final.distance.age <- merge( distance.by.females.age,
+                             distance.by.males.age,
+                             by="Age_Group"
+                             )
+
+final.speed.time <- merge( speed.by.females.time,
+                           speed.by.males.time,
+                           by="Time"
+                           )
+
+final.speed.age <- merge( speed.by.females.age,
+                          speed.by.males.age,
+                          by="Age_Group"
+                          )
+
+# Arrange merged datasets by Time and Age Group
+final.distance.time <- arrange( final.distance.time, Time)
+final.distance.age <- arrange( final.distance.age, Age_Group)
+
+final.speed.time <- arrange( final.speed.time, Time)
+final.speed.age <- arrange( final.speed.age, Age_Group)
+
+
+```
+
+```{r Design Dumbell Plots, echo=FALSE}
+
+# Set plot boundaries
+m <- list(
+  l = 100,
+  r = 100,
+  b = 50,
+  t = 50,
+  pad = 4
+)
+
+# Design distance by time dumbbell plot
+distance.time.plot <- plot_ly(final.distance.time, color = I("gray80")) %>%
+  add_segments(x = ~Distance_Female, xend = ~Distance_Male, y = ~Time, yend = ~Time,
+               showlegend = FALSE) %>%
+  add_markers(x = ~Distance_Female, y = ~Time, name = "Female", color = I("navyblue")) %>%
+  add_markers(x = ~Distance_Male, y = ~Time, name = "Male", color = I("palegreen3")) %>%
+  layout(
+     title = "Bike Ride Distance by Gender Throughout the Day",
+     xaxis = list(title = "Average Distance (in miles)"),
+     yaxis = list(title = ""),
+     margin = m
+     )
+
+# Design distance by age dumbbell plot
+distance.age.plot <- plot_ly(final.distance.age, color = I("gray80")) %>%
+  add_segments(x = ~Distance_Female, xend = ~Distance_Male, y = ~Age_Group, yend = ~Age_Group,
+               showlegend = FALSE) %>%
+  add_markers(x = ~Distance_Female, y = ~Age_Group, name = "Female", color = I("navyblue")) %>%
+  add_markers(x = ~Distance_Male, y = ~Age_Group, name = "Male", color = I("palegreen3")) %>%
+  layout(
+     title = "Bike Ride Distance by Age Group and Gender",
+     xaxis = list(title = "Average Distance (in miles)"),
+     yaxis = list(title = ""),
+     margin = m
+     )
+
+# Design speed by time dumbbell plot
+speed.time.plot <- plot_ly(final.speed.time, color = I("gray80")) %>%
+  add_segments(x = ~Speed_Female, xend = ~Speed_Male, y = ~Time, yend = ~Time,
+               showlegend = FALSE) %>%
+  add_markers(x = ~Speed_Female, y = ~Time, name = "Female", color = I("navyblue")) %>%
+  add_markers(x = ~Speed_Male, y = ~Time, name = "Male", color = I("palegreen3")) %>%
+  layout(
+     title = "Bike Ride Speed by Gender Throughout the Day",
+     xaxis = list(title = "Average Speed (in minutes)"),
+     yaxis = list(title = ""),
+     margin = m
+     )
+
+# Design speed by age dummbell plot
+speed.age.plot <- plot_ly(final.speed.age, color = I("gray80")) %>%
+  add_segments(x = ~Speed_Female, xend = ~Speed_Male, y = ~Age_Group, yend = ~Age_Group,
+               showlegend = FALSE) %>%
+  add_markers(x = ~Speed_Female, y = ~Age_Group, name = "Female", color = I("navyblue")) %>%
+  add_markers(x = ~Speed_Male, y = ~Age_Group, name = "Male", color = I("palegreen3")) %>%
+  layout(
+     title = "Bike Ride Speed by Age Group and Gender",
+     xaxis = list(title = "Average Speed (in minutes)"),
+     yaxis = list(title = ""),
+     margin = m
+     )
+```
+
+```{r Show Plots}
+distance.time.plot
+distance.age.plot
+speed.time.plot
+speed.age.plot
+```
+
+
+
